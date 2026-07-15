@@ -7,7 +7,7 @@ WHATSAPP_PHONE = os.environ.get("WHATSAPP_PHONE")
 WHATSAPP_APIKEY = os.environ.get("WHATSAPP_APIKEY")
 HISTORY_FILE = "hk_beyblade_history.txt"
 
-KEYWORDS = ["預購", "預約", "預訂", "BX", "UX", "Beyblade", "戰鬥陀螺"]
+KEYWORDS = ["UX-21", "UX21", "UX 21"]
 
 SITES = [
     {
