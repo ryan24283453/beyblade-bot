@@ -2,8 +2,9 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
-# 安全地從 GitHub 密碼本讀取 Webhook
-DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK")
+# 安全地從 GitHub 密碼本讀取 WhatsApp 設定
+WHATSAPP_PHONE = os.environ.get("WHATSAPP_PHONE")
+WHATSAPP_APIKEY = os.environ.get("WHATSAPP_APIKEY")
 HISTORY_FILE = "hk_beyblade_history.txt"
 
 KEYWORDS = ["預購", "預約", "預訂", "BX", "UX", "Beyblade", "戰鬥陀螺"]
@@ -45,25 +46,29 @@ def save_to_history(item_name):
     with open(HISTORY_FILE, "a", encoding="utf-8") as f:
         f.write(item_name + "\n")
 
-def send_discord_notification(site_name, title, url):
-    if not DISCORD_WEBHOOK_URL:
-        print("[錯誤] 找不到 Webhook 設定")
+def send_whatsapp_notification(site_name, title, url):
+    if not WHATSAPP_PHONE or not WHATSAPP_APIKEY:
+        print("[錯誤] 找不到 WhatsApp 設定檔")
         return
         
-    payload = {
-        "username": "香港陀螺預購情報員",
-        "avatar_url": "https://i.imgur.com/X4uN0mG.png", 
-        "embeds": [{
-            "title": f"🚨 {site_name} 新貨/預訂上架！",
-            "description": f"**商品：** {title}\n\n[👉 點我立刻前往搶購]({url})",
-            "color": 5814783,
-            "footer": {"text": "GitHub Actions 即時監控系統"}
-        }]
+    # WhatsApp 的排版語法（* 代表粗體）
+    text = f"🚨 *{site_name} 新貨/預訂上架！*\n\n*商品：*{title}\n\n👉 點我前往搶購：\n{url}"
+    
+    api_url = "https://api.callmebot.com/whatsapp.php"
+    params = {
+        "phone": WHATSAPP_PHONE,
+        "text": text,
+        "apikey": WHATSAPP_APIKEY
     }
+    
     try:
-        requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
+        response = requests.get(api_url, params=params, timeout=10)
+        if response.status_code == 200:
+            print(f"[成功] 已發送 WhatsApp 通知：{title}")
+        else:
+            print(f"[失敗] WhatsApp API 錯誤，狀態碼：{response.status_code}")
     except Exception as e:
-        print(f"[Discord 錯誤] 無法發送通知: {e}")
+        print(f"[WhatsApp 錯誤] 無法發送通知: {e}")
 
 def check_sites():
     notified_list = get_notified_list()
@@ -99,7 +104,7 @@ def check_sites():
                     unique_id = f"[{site['name']}] {title}"
                     if unique_id not in notified_list:
                         print(f"  ✨ [發現新商品] {title}")
-                        send_discord_notification(site['name'], title, link)
+                        send_whatsapp_notification(site['name'], title, link)
                         save_to_history(unique_id)
         except Exception as e:
             print(f"  [錯誤] 檢查 {site['name']} 發生異常: {e}")
