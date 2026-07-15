@@ -1,21 +1,9 @@
 import os
-import time
-import threading
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask  # 新增網頁套件
 
-# ==================== Flask 網頁伺服器設定 ====================
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    # 當有人（或 UptimeRobot）訪問網址時，會顯示這行字，確保程式沒休眠
-    return "🤖 陀螺監控機器人運作中！"
-
-# ==================== 核心設定 ====================
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1527016875194843297/aNNnXUHaqO3hnKRVZGoLnSkcFlbZPjBpJQ2RIhQg79hGGX4GSPHZfdFwr29nWoap1pR4"
-CHECK_INTERVAL = 120  # 每 2 分鐘檢查一次
+# 安全地從 GitHub 密碼本讀取 Webhook
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK")
 HISTORY_FILE = "hk_beyblade_history.txt"
 
 KEYWORDS = ["預購", "預約", "預訂", "BX", "UX", "Beyblade", "戰鬥陀螺"]
@@ -58,6 +46,10 @@ def save_to_history(item_name):
         f.write(item_name + "\n")
 
 def send_discord_notification(site_name, title, url):
+    if not DISCORD_WEBHOOK_URL:
+        print("[錯誤] 找不到 Webhook 設定")
+        return
+        
     payload = {
         "username": "香港陀螺預購情報員",
         "avatar_url": "https://i.imgur.com/X4uN0mG.png", 
@@ -65,7 +57,7 @@ def send_discord_notification(site_name, title, url):
             "title": f"🚨 {site_name} 新貨/預訂上架！",
             "description": f"**商品：** {title}\n\n[👉 點我立刻前往搶購]({url})",
             "color": 5814783,
-            "footer": {"text": "香港玩具店即時監控系統"}
+            "footer": {"text": "GitHub Actions 即時監控系統"}
         }]
     }
     try:
@@ -76,7 +68,7 @@ def send_discord_notification(site_name, title, url):
 def check_sites():
     notified_list = get_notified_list()
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
     for site in SITES:
@@ -85,7 +77,6 @@ def check_sites():
             response = requests.get(site["url"], headers=headers, timeout=15)
             
             if response.status_code != 200:
-                print(f"  [警告] {site['name']} 讀取失敗，狀態碼：{response.status_code}")
                 continue
                 
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -110,23 +101,10 @@ def check_sites():
                         print(f"  ✨ [發現新商品] {title}")
                         send_discord_notification(site['name'], title, link)
                         save_to_history(unique_id)
-                        
         except Exception as e:
-            print(f"  [錯誤] 檢查 {site['name']} 時發生異常: {e}")
-
-# 背景監控執行緒
-def run_monitor_loop():
-    print("🤖 背景陀螺預購監控執行緒已啟動...")
-    while True:
-        check_sites()
-        print(f"💤 休息 {CHECK_INTERVAL} 秒後繼續...")
-        time.sleep(CHECK_INTERVAL)
+            print(f"  [錯誤] 檢查 {site['name']} 發生異常: {e}")
 
 if __name__ == "__main__":
-    # 啟動背景監控執行緒
-    monitor_thread = threading.Thread(target=run_monitor_loop, daemon=True)
-    monitor_thread.start()
-    
-    # 啟動 Flask 網頁伺服器（Render 會自動偵測 PORT）
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    print("啟動單次掃描...")
+    check_sites()
+    print("掃描完成。")
